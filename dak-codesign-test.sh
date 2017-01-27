@@ -2,10 +2,9 @@
 
 set -eo pipefail
 
-byhand=byhand-code-sign-user
 signfile=/home/koike/caneca/opw/linux/scripts/sign-file
-filein=${1-/tmp/test-objects.tar.xz}
-fileout=sigs-${filein##*/}
+filein=${1-$PWD/test-objects.tar.xz}
+conf_file="/etc/dsigning-box/secure-boot-code-sign.conf"
 # yubikey default key
 key=010203040506070801020304050607080102030405060708
 opensc_mod=/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so
@@ -49,7 +48,16 @@ openssl pkcs12 -export \
         -name efi-image
 pk12util -i efi-image.p12 -d "$certdir" -K '' -W ''
 
-cat << EOF > test.conf
+# Set dsigning-box dir
+echo $PWD
+mkdir -p dsigning_box_dir/img
+cp $filein dsigning_box_dir/img
+dsigning_box_dir="$PWD/dsigning_box_dir"
+
+sudo tee 1>/dev/null "$conf_file" << EOF
+IMG_DIR="${dsigning_box_dir}/img"
+SIG_DIR="${dsigning_box_dir}/sig"
+
 EFI_CERT_DIR="${certdir}" 
 EFI_CERT_NAME="efi-image"
 EFI_TOKEN_NAME="NSS Certificate DB"
@@ -59,7 +67,7 @@ LINUX_MODULES_PRIVKEY=test-key.rsa
 LINUX_MODULES_CERT=test-cert.pem
 EOF
 
-$byhand test.conf < $filein > $fileout
+fileout=$(secure-boot-code-sign ${filein##*/})
 tar xvaf $fileout
 cd ../
 
@@ -83,7 +91,15 @@ openssl pkcs12 -export -passin pass:121212 \
         -name efi-image
 pk12util -i efi-image.p12 -d "$certdir" -K '565656' -W '343434'
 
-cat << EOF > test.conf
+# Set dsigning-box dir
+mkdir -p dsigning_box_dir/img
+cp $filein dsigning_box_dir/img
+dsigning_box_dir="$PWD/dsigning_box_dir"
+
+sudo tee 1>/dev/null "$conf_file" << EOF
+IMG_DIR="${dsigning_box_dir}/img"
+SIG_DIR="${dsigning_box_dir}/sig"
+
 EFI_CERT_DIR="${certdir}" 
 EFI_CERT_NAME="efi-image"
 EFI_TOKEN_NAME="NSS Certificate DB"
@@ -95,7 +111,7 @@ LINUX_MODULES_CERT=test-cert.pem
 LINUX_SIGN_PIN=121212
 EOF
 
-$byhand test.conf < $filein > $fileout
+fileout=$(secure-boot-code-sign ${filein##*/})
 tar xvaf $fileout
 cd ../
 
@@ -119,7 +135,15 @@ mkdir certdir
 certdir="$PWD/certdir"
 certutil --empty-password -A -n "efi-cert" -t ,,T -d $certdir -a -i test-cert.pem
 
-cat << EOF > test.conf
+# Set dsigning-box dir
+mkdir -p dsigning_box_dir/img
+cp $filein dsigning_box_dir/img
+dsigning_box_dir="$PWD/dsigning_box_dir"
+
+sudo tee 1>/dev/null "$conf_file" << EOF
+IMG_DIR="${dsigning_box_dir}/img"
+SIG_DIR="${dsigning_box_dir}/sig"
+
 EFI_CERT_DIR="${certdir}" 
 EFI_CERT_NAME="Certificate for Digital Signature"
 EFI_TOKEN_NAME="PIV_II (PIV Card Holder pin)"
@@ -133,7 +157,7 @@ EOF
 
 # workaround needed for pesign to find the token
 ln -s ${opensc_mod} $certdir/libnssckbi.so
-$byhand test.conf < $filein > $fileout
+fileout=$(secure-boot-code-sign ${filein##*/})
 tar xvaf $fileout
 cd ../
 
@@ -160,7 +184,15 @@ certdir="$PWD/certdir"
 echo 989898 > /tmp/password
 certutil -f /tmp/password -A -n "efi-cert" -t ,,T -d $certdir -a -i test-cert.pem
 
-cat << EOF > test.conf
+# Set dsigning-box dir
+mkdir -p dsigning_box_dir/img
+cp $filein dsigning_box_dir/img
+dsigning_box_dir="$PWD/dsigning_box_dir"
+
+sudo tee 1>/dev/null "$conf_file" << EOF
+IMG_DIR="${dsigning_box_dir}/img"
+SIG_DIR="${dsigning_box_dir}/sig"
+
 EFI_CERT_DIR="${certdir}" 
 EFI_CERT_NAME="Certificate for Digital Signature"
 EFI_TOKEN_NAME="PIV_II (PIV Card Holder pin)"
@@ -174,7 +206,7 @@ EOF
 
 # workaround needed for pesign to find the token
 ln -s ${opensc_mod} $certdir/libnssckbi.so
-$byhand test.conf < $filein > $fileout
+fileout=$(secure-boot-code-sign ${filein##*/})
 tar xvaf $fileout
 cd ../
 
